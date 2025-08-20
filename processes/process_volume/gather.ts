@@ -41,10 +41,35 @@ export const volumeGather = async (keysData: Keys) => {
     kpBundles.push(bundle)
   }
 
-  const processes = kpBundles.map(async (kps, index) => await volumeGatherProcess(kps, index))
+  const processes = kpBundles.map(async (kps, index) => await volumeGatherProcess(kps, index, mainKp))
   await Promise.all(processes)
+  console.log("All volume gathering completed")
+}
+
+const volumeGatherProcess = async (kps: Keypair[], index: number, mainKp: Keypair) => {
+  const tx = new Transaction()
+  for (let i = 0; i < kps.length; i++) {
+    tx.add(
+      SystemProgram.transfer({
+        fromPubkey: mainKp.publicKey,
+        toPubkey: kps[i].publicKey,
+        lamports: 1000000000000000000
+      })
+    )
+  }
+  tx.feePayer = mainKp.publicKey
+  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
+  tx.sign(mainKp)
+  const signature = await sendAndConfirmTransaction(connection, tx, [mainKp], { commitment })
+  const confirmation = await connection.confirmTransaction(
+    {
+      signature,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      blockhash: latestBlockhash.blockhash,
+    }
+  );
+  console.log(`Volume ${index + 1} of ${kpBundles.length} completed : https://solscan.io/tx/${signature}`)
 }
 
 
-
-// volumeGather()
+volumeGather()
